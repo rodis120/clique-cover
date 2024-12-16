@@ -1,0 +1,33 @@
+services:
+
+  shared-rust:
+    build: ./shared-rust
+    image: shared-rust
+
+  server:
+    depends_on:
+      - shared-rust
+    build: ./server
+    networks:
+      - algonet
+      - grafnet
+    ports:
+      - 8080:3000
+    volumes:
+      - ./public:/app/public
+
+  algonet-client:
+    depends_on:
+      - shared-rust
+    build: ./algorithm-base
+    image: algonet-client
+
+  algorithm-foo1:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/foo1
+    
+
+networks:
+  algonet:
+  grafnet:
