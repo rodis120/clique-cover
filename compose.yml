@@ -18,7 +18,7 @@ services:
 
   algonet-client:
     depends_on:
-      - shared-rust
+      - server
     build: ./algorithm-base
     image: algonet-client
 
@@ -26,6 +26,8 @@ services:
     depends_on:
       - algonet-client
     build: ./algorithms/foo1
+    networks:
+      - algonet
     
 
 networks:

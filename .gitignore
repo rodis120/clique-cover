@@ -1,3 +1,5 @@
+workflow-script
 algorithm-base/wrapper/target
+algorithm-base/shared-rust
 server/target
 shared-rust/target

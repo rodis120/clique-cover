@@ -1,3 +1,4 @@
+use futures::future;
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -28,6 +29,8 @@ pub async fn handle_algonet(
         tx_to_website,
         shared_state,
     };
+    println!("algonet: initiated");
+
     loop {
         let (tcp_stream, _) = listener.accept().await?;
         let ws_stream = accept_async(tcp_stream).await?;
@@ -77,9 +80,11 @@ async fn handle_algonet_ws(
         },
     ];
 
+    let (_, _, tasks) = future::select_all(handles).await;
 
-    loop {
-        sleep(Duration::from_secs(10));
+    println!("algonet_handler: aborting");
+    for handle in tasks {
+        handle.abort();
     }
 }
 
