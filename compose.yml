@@ -32,6 +32,8 @@ services:
   graph-generator:
     build: ./graph-generation
     image: graph-generator
+    environment:
+      - JVM_ARGS=-Xms256M -Xmx512M
     networks:
       - grafnet
 

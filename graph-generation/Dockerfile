@@ -7,5 +7,5 @@ FROM eclipse-temurin:latest
 WORKDIR /generator
 COPY --from=build /build/target/reggraphgen-1.0.0-jar-with-dependencies.jar /generator/reggraphgen.jar
 EXPOSE 8080/tcp
-CMD java -jar /generator/reggraphgen.jar
+CMD java $JVM_ARGS -jar /generator/reggraphgen.jar
 
