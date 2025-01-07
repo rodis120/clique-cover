@@ -28,7 +28,14 @@ services:
     build: ./algorithms/foo1
     networks:
       - algonet
-    
+  
+  graph-generator:
+    build: ./graph-generation
+    image: graph-generator
+    environment:
+      - JVM_ARGS=-Xms256M -Xmx512M
+    networks:
+      - grafnet
 
 networks:
   algonet:
