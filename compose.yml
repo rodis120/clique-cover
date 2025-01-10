@@ -29,6 +29,12 @@ services:
     networks:
       - algonet
     
+  algorithm-foo2:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/foo2
+    networks:
+      - algonet
 
 networks:
   algonet:

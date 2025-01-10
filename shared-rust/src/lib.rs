@@ -60,7 +60,7 @@ pub struct GraphDist {
     pub n_nodes_min: u16,
     pub n_nodes_max: u16,
     pub n_nodes_step: u16,
-    pub node_degree: f64,
+    pub node_density: f64,
     pub n_iterations: u16,
 }
 
@@ -73,7 +73,7 @@ impl GraphDist {
             n_nodes_min: 0,
             n_nodes_max: 0,
             n_nodes_step: 0,
-            node_degree: 0.0,
+            node_density: 0.0,
             n_iterations: 0,
         }
     }
@@ -85,7 +85,7 @@ impl Default for GraphDist {
             n_nodes_min: 100,
             n_nodes_max: 1000,
             n_nodes_step: 1,
-            node_degree: 0.2,
+            node_density: 0.2,
             n_iterations: 5,
         }
     }

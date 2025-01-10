@@ -55,7 +55,36 @@ function setupInput(inputElements) {
     });
 }
 
-function createWebSocket(wsPath, inputElements) {
+function createRunRequest(inputElements) {
+
+    const nodesMin = inputElements.numbers.nodesMin.value;
+    const nodesMax = inputElements.numbers.nodesMax.value;
+    const nodesStep = inputElements.numbers.nodesStep.value;
+    const nodeDensity = inputElements.numbers.nodeDensity.value;
+    const iterations = inputElements.numbers.iterations.value;
+
+    const algosInUse = Array.from(inputElements.checkboxes)
+        .filter(checkbox => checkbox.checked)
+        .map(checkbox => parseInt(checkbox.id.replace('menu-algo-checkbox-', '')));
+
+    const request = {
+        RequestRestart: [
+            "here would go the password if i had time to implement that functionality",
+            {
+                n_nodes_min: parseInt(nodesMin),
+                n_nodes_max: parseInt(nodesMax),
+                n_nodes_step: parseInt(nodesStep),
+                node_density: parseInt(nodeDensity),
+                n_iterations: parseInt(iterations),
+            },
+            algosInUse,
+        ],
+    };
+    
+    return request;
+}
+
+function createWebSocket(wsPath, inputElements, appState) {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host
     const wsUrl = `${wsProtocol}//${wsHost}/${wsPath}`;
@@ -70,6 +99,60 @@ function createWebSocket(wsPath, inputElements) {
         let payload = event.data;
         console.log('received from ws:', payload);
 
+        let msg = JSON.parse(event.data);
+        let msgType = Object.keys(msg)[0];
+        let msgPayload = msg[msgType];
+
+        switch (msgType) {
+            
+            case 'AlgoList':
+                appState.algorithms.names = msgPayload.reduce((acc, [id, name]) => {
+                    acc[id] = name;
+                    return acc;
+                }, {});
+
+                const algoListDiv = document.getElementById('menu-algo-list');
+                algoListDiv.innerHtml = '';
+                inputElements.checkboxes = [];
+                Object.entries(appState.algorithms.names).forEach(([id, name]) => {
+                    const div = document.createElement('div');
+                    div.id = `menu-algo-${id}`;
+
+                    const checkbox = document.createElement('input');
+                    checkbox.type = 'checkbox';
+                    checkbox.id = `menu-algo-checkbox-${id}`;
+                    checkbox.checked = true;
+                    inputElements.checkboxes.push(checkbox);
+
+                    const label = document.createElement('h5');
+                    label.textContent = name;
+
+                    div.appendChild(checkbox);
+                    div.appendChild(label);
+
+                    algoListDiv.appendChild(div);
+                });
+
+                break;
+
+            case 'AlgosInUse':
+                appState.algorithms.inUse = msgPayload;
+                
+                const areUsed = Object.keys(appState.algorithms.names)
+                    .map(key => false);
+
+                appState.algorithms.inUse.forEach((id) => {
+                    areUsed[id] = true;
+                });
+                
+
+                areUsed.forEach((val, id) => {
+                    const checkbox = document.getElementById(`menu-algo-checkbox-${id}`);
+                    checkbox.checked = val;
+                });
+
+                break;
+        }
     });
 
     socket.addEventListener('error', (error) => {
@@ -81,6 +164,8 @@ function createWebSocket(wsPath, inputElements) {
 
 document.addEventListener('DOMContentLoaded', () => {
     const inputElements = {
+        checkboxes: {
+        },
         sliders: {
             nodesMin: document.getElementById('slider-nodes-min'),
             nodesMax: document.getElementById('slider-nodes-max'),
@@ -104,15 +189,30 @@ document.addEventListener('DOMContentLoaded', () => {
         },
     };
 
-    const socket = createWebSocket('ws', inputElements);
+    const appState = {
+        running: false,
+        algorithms: {
+        },
+        graphs: {
+        },
+        solutions: {
+        },
+    };
+
+    const socket = createWebSocket('ws', inputElements, appState);
 
     setupInput(inputElements);
 
-    let launchButton = document.getElementById('button-launch');
+    let launchButton = document.getElementById('launch-button');
 
     launchButton.addEventListener('click', () => {
-        console.log('socket state:', socket.readyState);
         if (socket.readyState === WebSocket.OPEN) {
+            console.log("Launch Button clicked");
+            if (!appState.running) {
+                const message = createRunRequest(inputElements);
+                socket.send(JSON.stringify(message));
+                console.log("Sending the following message to the server:", message);
+            }
         }
     });
 

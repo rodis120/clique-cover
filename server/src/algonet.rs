@@ -66,14 +66,28 @@ async fn handle_algonet_ws(
 
     let handles: Vec<tokio::task::JoinHandle<()>> = vec![
         {
-            let shared_state = state.shared_state.clone();
             let tx_to_website = state.tx_to_website;
+            let state = state.shared_state.clone();
             tokio::spawn(async move {
                 while let Some(Ok(Message::Binary(contents))) = ws_read.next().await {
                     let deserialized: std::result::Result<MyMsg, _> 
                         = bincode::deserialize(&contents);
                     if let Ok(MyMsg::Greet(name)) = deserialized {
                         println!("A new algorithm signed up: {}", name);
+                        let mut id: u16 = 0xffff;
+
+                        // add algorithm to state.algorithms
+                        {
+                            let mut guard = state.algorithms.write().await;
+                            id = guard.len() as u16;
+                            guard.push((id, name));
+                        }
+
+                        // add algorithm to state.algos_in_use
+                        {
+                            let mut guard = state.algos_in_use.write().await;
+                            guard.push(id);
+                        }
                     }
                 }
             })

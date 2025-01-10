@@ -49,6 +49,17 @@ async fn handle_websocket(
             let mut rx_at_website = state.rx_at_website;
 
             {
+                // FOR TESTING PURPOSES, REMOVE IT LATER
+                let msg = MyMsg::RequestRestart(
+                    "xdddd".to_string(),
+                    GraphDist::default(),
+                    vec![2, 1, 3, 7],
+                );
+                if let Ok(serialized) = serde_json::to_string(&msg) {
+                    let _ = ws_write.send(Message::Text(serialized)).await;
+                }
+                // -------------------------------------
+                
                 let graph_dist = shared_state.graph_dist.clone();
                 let msg = MyMsg::GraphDist(graph_dist);
                 if let Ok(serialized) = serde_json::to_string(&msg) {

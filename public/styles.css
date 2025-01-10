@@ -1,0 +1,41 @@
+#settings-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    margin-top: 20px;
+    width = 100%;
+}
+
+#menu-box {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+    width = 70%;
+}
+
+#menu-box > div {
+    border: 5px solid red;
+    padding: 15px;
+    box-sizing: border-box;
+}
+
+#menu-algo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#menu-algo-list > div {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+#menu-graph-params {
+    display: grid;
+    grid-template-columns: 2fr 2fr 1fr;
+}
