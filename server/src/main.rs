@@ -16,6 +16,9 @@ use website::handle_website;
 mod algonet;
 use algonet::handle_algonet;
 
+mod grafnet;
+use grafnet::handle_grafnet;
+
 const HASH_SEED: u64 = 0xdb2137db;
 const CHANNEL_SIZE: usize = 1024;
 
@@ -25,7 +28,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let website_addr: SocketAddr = ([0, 0, 0, 0,], 3000).into();
     let algonet_addr: SocketAddr = ([0, 0, 0, 0,], 3001).into();
-    let grafnet_addr: SocketAddr = ([0, 0, 0, 0,], 3002).into();
+    let graph_gen_path: String = "http://graph-generator:8123/gen_graph".to_string();
 
     let (tx_to_algonet, mut rx_at_algonet) = broadcast::channel::<MyMsg>(CHANNEL_SIZE);
     let (tx_to_website, mut rx_at_website) = broadcast::channel::<MyMsg>(CHANNEL_SIZE);
@@ -61,6 +64,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 ).await;
             })
         },
+        {
+            let tx_to_algonet = tx_to_algonet.clone();
+            let tx_to_website = tx_to_website.clone();
+            tokio::spawn(async move {
+                handle_grafnet(
+                    graph_gen_path,
+                    rx_at_grafnet,
+                    tx_to_algonet.clone(),
+                    tx_to_website.clone(),
+                ).await;
+            })
+        }
     ];
 
     let (_, _, tasks) = future::select_all(handles).await;

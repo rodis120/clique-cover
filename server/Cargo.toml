@@ -25,3 +25,4 @@ tokio-util = { version = "0.7.13", features = ["io"] }
 tower-http = { version = "0.6.1", features = ["fs"] }
 twox-hash = "2.0"
 tungstenite = "0.24"
+ureq = "2.12"
