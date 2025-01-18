@@ -1,3 +1,4 @@
+use std::fmt;
 use serde::{Serialize, Deserialize};
 
 pub type Error = Box<dyn std::error::Error + Send + Sync + 'static>;
@@ -19,7 +20,6 @@ pub enum MyMsg {
     SolutionProduced(u8, u32, Solution), // session, graph, Solution
 
     GraphReady(u8, u32),
-    GraphProduced(u8, Graph),
 
     GraphDist2Generate(u8, GraphDist),
     Restart(Vec<(u16, u16)>), // general_algo_id, session_specific_algo_id
@@ -46,7 +46,7 @@ pub struct Settings {}
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Graph {
-    pub inner: Vec<u8>,
+    pub inner: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -66,6 +66,12 @@ pub struct GraphDist {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Summary {}
+
+impl fmt::Display for Graph {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.inner)
+    }
+}
 
 impl GraphDist {
     pub fn empty() -> Self {

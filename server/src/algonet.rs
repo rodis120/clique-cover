@@ -2,14 +2,10 @@ use futures::future;
 use futures_util::{sink::SinkExt, stream::StreamExt};
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU16, Ordering};
 use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt};
 use tokio::net::{TcpStream, TcpListener};
-use tokio::sync::Mutex;
-use tokio::sync::RwLock;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
-use tokio::time::{sleep, Duration};
+use tokio::sync::{broadcast, mpsc};
 use tokio_tungstenite::accept_async;
 use tokio_tungstenite::WebSocketStream;
 use tokio_tungstenite::tungstenite::protocol::Message;
@@ -64,6 +60,8 @@ async fn handle_algonet_ws(
     println!("algonet: handle_websocket: initiated");
     let (mut ws_write, mut ws_read) = ws_stream.split();
 
+    let (tx_algo_id, mut rx_algo_id) = mpsc::channel(1);
+
     let handles: Vec<tokio::task::JoinHandle<()>> = vec![
         {
             let tx_to_website = state.tx_to_website;
@@ -72,22 +70,58 @@ async fn handle_algonet_ws(
                 while let Some(Ok(Message::Binary(contents))) = ws_read.next().await {
                     let deserialized: std::result::Result<MyMsg, _> 
                         = bincode::deserialize(&contents);
-                    if let Ok(MyMsg::Greet(name)) = deserialized {
-                        println!("A new algorithm signed up: {}", name);
-                        let mut id: u16 = 0xffff;
+                    if let Ok(msg) = deserialized {
+                        match msg {
+                            MyMsg::Greet(name) => {
+                                println!("A new algorithm has signed up: {}", name);
 
-                        // add algorithm to state.algorithms
-                        {
-                            let mut guard = state.algorithms.write().await;
-                            id = guard.len() as u16;
-                            guard.push((id, name));
-                        }
+                                let tx_algo_id = tx_algo_id.clone();
+                                let mut id = 0xffffu16;
 
-                        // add algorithm to state.algos_in_use
-                        {
-                            let mut guard = state.algos_in_use.write().await;
-                            guard.push(id);
+                                // add algorithm to state.algorithms
+                                {
+                                    let mut guard = state.algorithms.write().await;
+                                    id = guard.len() as u16;
+                                    if (id == 0xffff) {
+                                        eprintln!("algonet: a hilarious situation has occured");
+                                    }
+                                    guard.push((id, name));
+                                }
+
+                                // add algorithm to state.algos_in_use
+                                {
+                                    let mut guard = state.algos_in_use.write().await;
+                                    guard.push(id);
+                                }
+
+                                let _ = tx_algo_id.send(id).await;
+                            },
+                            _ => {},
                         }
+                    }
+                }
+            })
+        },
+        {
+            let mut rx_at_algonet = state.rx_at_algonet;
+            let state = state.shared_state.clone();
+            tokio::spawn(async move {
+                let mut active = false;
+                let id = rx_algo_id.recv().await
+                    .expect("algonet: fatal error, failed to send id");
+                println!("algonet: ipc_read task has received id={id}");
+
+                while let Ok(msg) = rx_at_algonet.recv().await {
+                    match msg {
+                        MyMsg::AlgosInUse(algos) => {
+                            if algos.contains(&id) {
+                                active = true;
+                                println!("algonet: algo#{id} set as ACTIVE");
+                            } else {
+                                println!("algonet: algo#{id} set as INACTIVE");
+                            }
+                        },
+                        _ => {},
                     }
                 }
             })

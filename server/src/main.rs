@@ -2,13 +2,12 @@ use futures::future;
 use std::path::PathBuf;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::net::lookup_host;
 use tokio::sync::{broadcast, mpsc};
 
 use shared::MyMsg;
 
 mod types;
-use types::{SharedState, Database};
+use types::SharedState;
 
 mod website;
 use website::handle_website;
@@ -67,12 +66,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         {
             let tx_to_algonet = tx_to_algonet.clone();
             let tx_to_website = tx_to_website.clone();
+            let shared_state = shared_state.clone();
             tokio::spawn(async move {
                 handle_grafnet(
                     graph_gen_path,
                     rx_at_grafnet,
                     tx_to_algonet.clone(),
                     tx_to_website.clone(),
+                    shared_state.clone(),
                 ).await;
             })
         }

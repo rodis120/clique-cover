@@ -6,29 +6,27 @@ use futures::future;
 use futures::{SinkExt, StreamExt, TryStreamExt};
 use http_body_util::{combinators::BoxBody, BodyExt, Full, StreamBody, Empty};
 use hyper::{Request, Response, StatusCode};
-use hyper::body::{Body, Incoming, Frame};
-use hyper::header;
+use hyper::body::{Incoming, Frame};
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
-use hyper::upgrade;
 use hyper_util::rt::tokio::TokioIo;
-use hyper_tungstenite::{WebSocketStream, HyperWebsocket};
+use hyper_tungstenite::HyperWebsocket;
 use hyper_tungstenite::tungstenite::protocol::Message;
 use serde_json;
 use std::convert::Infallible;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::Ordering;
 use tokio::fs::File;
-use tokio::io::{AsyncRead, AsyncWrite, AsyncReadExt};
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 use tokio::sync::broadcast;
 use tokio::sync::mpsc;
 use tokio::time::{sleep, Duration};
 use tokio_util::io::ReaderStream;
 
-use shared::{Result, Error, MyMsg, RunParams, GraphDist};
+use shared::{Result, MyMsg, GraphDist};
 
 use crate::types::{SharedState, Database};
 
@@ -62,7 +60,7 @@ async fn handle_websocket(
                     }
                     // -------------------------------------
                     
-                    let graph_dist = shared_state.graph_dist.clone();
+                    let graph_dist = shared_state.graph_dist.read().await.clone();
                     let msg = MyMsg::GraphDist(graph_dist);
                     if let Ok(serialized) = serde_json::to_string(&msg) {
                         let _ = ws_write.send(Message::Text(serialized)).await;
@@ -80,9 +78,12 @@ async fn handle_websocket(
                         let _ = ws_write.send(Message::Text(serialized)).await;
                     }
 
-                    let graph_order = shared_state.database.get_graph_order().await;
+                    let graph_order = shared_state.database.read().await.get_graph_order().await;
                     for id in graph_order.into_iter() {
-                        if let Some(graph) = shared_state.database.get_graph(id).await {
+                        if let Some(graph) = shared_state
+                            .database.read().await
+                            .get_graph(id).await
+                        {
                             let msg = MyMsg::Graph(
                                 shared_state.session_id.load(Ordering::Acquire),
                                 id,
@@ -91,25 +92,60 @@ async fn handle_websocket(
                             if let Ok(serialized) = serde_json::to_string(&msg) {
                                 let _ = ws_write.send(Message::Text(serialized)).await;
                             }
+                        } else {
+                            eprintln!("website: failed to fetch graph#{id}");
                         }
                     }
 
-                    let solution_order = shared_state.database.get_solution_order().await;
+
+                    let solution_order = shared_state
+                        .database.read().await
+                        .get_solution_order().await;
                     for id in solution_order.into_iter() {
-                        let (algo_id, graph_id) = shared_state.database.get_algo_and_graph_id(id);
+                        let (algo_id, graph_id) = shared_state
+                            .database.read().await
+                            .get_algo_and_graph_id(id);
                         if let Some(solution) = shared_state
-                            .database
-                            .get_solution(algo_id, graph_id)
-                            .await {
-                                let msg = MyMsg::Solution(
-                                    shared_state.session_id.load(Ordering::Acquire),
-                                    algo_id,
-                                    graph_id,
-                                    solution,
-                                );
-                                if let Ok(serialized) = serde_json::to_string(&msg) {
-                                    let _ = ws_write.send(Message::Text(serialized)).await;
+                            .database.read().await
+                            .get_solution(algo_id, graph_id).await
+                        {
+                            let msg = MyMsg::Solution(
+                                shared_state.session_id.load(Ordering::Acquire),
+                                algo_id,
+                                graph_id,
+                                solution,
+                            );
+                            if let Ok(serialized) = serde_json::to_string(&msg) {
+                                let _ = ws_write.send(Message::Text(serialized)).await;
+                            }
+                        } else {
+                            eprintln!("website: failed to fetch solution#{id}");
+                        }
+                    }
+
+                    println!("website: listening to messages");
+                    
+                    while let Ok(msg) = rx_at_website.recv().await {
+                        match msg {
+                            MyMsg::GraphReady(session_id, graph_id) => {
+                                if let Some(graph) = shared_state
+                                    .database.read().await
+                                    .get_graph(graph_id).await
+                                {
+                                    let msg = MyMsg::Graph(
+                                        shared_state.session_id.load(Ordering::Acquire),
+                                        graph_id,
+                                        graph,
+                                    );
+                                    if let Ok(serialized) = serde_json::to_string(&msg) {
+                                        let _ = ws_write.send(Message::Text(serialized)).await;
+                                    }
+                                    println!("website: sent graph#{graph_id}");
+                                } else {
+                                    eprintln!("website: failed to fetch graph#{graph_id}");
                                 }
+                            },
+                            _ => {},
                         }
                     }
                 }
@@ -135,12 +171,14 @@ async fn handle_websocket(
                                 match msg {
                                     MyMsg::RequestRestart(password, graph_dist, algos_in_use) => {
                                         let shared_state = shared_state.clone();
+                                        let tx_to_algonet = tx_to_algonet.clone();
                                         let tx_to_grafnet = tx_to_grafnet.clone();
                                         tokio::spawn(
                                             new_session(
                                                 password,
                                                 graph_dist,
                                                 algos_in_use,
+                                                tx_to_algonet,
                                                 tx_to_grafnet,
                                                 shared_state,
                                             )
@@ -175,6 +213,7 @@ async fn new_session(
     password: String,
     graph_dist: GraphDist,
     algos_in_use: Vec<u16>,
+    tx_to_algonet: broadcast::Sender<MyMsg>,
     tx_to_grafnet: mpsc::Sender<MyMsg>,
     shared_state: Arc<SharedState>,
 ) {
@@ -188,12 +227,26 @@ async fn new_session(
     println!("----new session_id: {}", new_session_id);
 
     {
+        let mut guard = shared_state.graph_dist.write().await;
+        *guard = graph_dist.clone();
+    }
+
+    {
         let mut guard = shared_state.algos_in_use.write().await;
-        *guard = algos_in_use;
+        *guard = algos_in_use.clone();
+    }
+
+    {
+        let mut guard = shared_state.database.write().await;
+        *guard = Database::new(algos_in_use.len() as u16, graph_dist.clone());
+    }
+
+    let algonet_msg = MyMsg::AlgosInUse(algos_in_use);
+    if let Err(e) = tx_to_algonet.send(algonet_msg) {
+        eprintln!("website: failed to send AlgosInUse");
     }
 
     let grafnet_msg = MyMsg::GraphDist2Generate(new_session_id, graph_dist);
-
     if let Err(e) = tx_to_grafnet.send(grafnet_msg).await {
         eprintln!("website: failed to send GraphDist2Generate");
     }

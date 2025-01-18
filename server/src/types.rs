@@ -1,29 +1,27 @@
 #[allow(unused_imports)]
 
+use std::fmt;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
-use tokio::net::{TcpStream, TcpListener};
-use tokio::sync::Mutex;
+use std::sync::atomic::AtomicU8;
 use tokio::sync::RwLock;
-use tokio::sync::broadcast;
-use tokio::sync::mpsc;
-use shared::{MyMsg, Solution, Graph, GraphDist, Algo, Summary};
+use shared::{Solution, Graph, GraphDist, Summary};
 
 pub struct SharedState {
     pub session_id: AtomicU8,
     pub algorithms: RwLock<Vec<(u16, String)>>,
     pub algos_in_use: RwLock<Vec<u16>>,
-    pub graph_dist: GraphDist,
-    pub database: Database,
+    pub graph_dist: RwLock<GraphDist>,
+    pub database: RwLock<Database>,
 }
 
+#[derive(Debug)]
 pub struct Database {
     size: u64,
     h_size: u16,
     v_size: u16,
     n_algos: u16,
-    graphs: Box<[RwLock<Option<Graph>>]>,
-    solutions: Box<[RwLock<Option<Solution>>]>,
+    graphs: Arc<[RwLock<Option<Graph>>]>,
+    solutions: Arc<[RwLock<Option<Solution>>]>,
     graph_order: RwLock<Vec<u32>>,
     solution_order: RwLock<Vec<u64>>,
     summary: RwLock<Option<Summary>>,
@@ -35,17 +33,20 @@ impl SharedState {
             session_id: AtomicU8::new(0),
             algos_in_use: RwLock::new(Vec::new()),
             algorithms: RwLock::new(Vec::new()),
-            graph_dist: GraphDist::default(),
-            database: Database::new(0, GraphDist::default()),
+            graph_dist: RwLock::new(GraphDist::default()),
+            database: RwLock::new(Database::new(0, GraphDist::default())),
         }
     }
 }
 
 impl Database {
     pub fn new(n_algos: u16, graph_dist: GraphDist) -> Self {
-        let v_size = (1 + graph_dist.n_nodes_max - graph_dist.n_nodes_min) / 2;
+        let v_size = 
+            (graph_dist.n_nodes_max - graph_dist.n_nodes_min)
+            / graph_dist.n_nodes_step
+            + 1;
         let h_size = graph_dist.n_iterations;
-        let size = v_size * h_size * n_algos;
+        let size = v_size as u64 * h_size as u64 * n_algos as u64;
 
         let graphs_vec: Vec<RwLock<Option<Graph>>> =
             (0..h_size * v_size)
@@ -57,16 +58,16 @@ impl Database {
                 .map(|_| RwLock::new(None))
                 .collect();
 
-        let graph_order= RwLock::new(Vec::<u32>::with_capacity(size.into()));
-        let solution_order = RwLock::new(Vec::<u64>::with_capacity(size.into()));
+        let graph_order= RwLock::new(Vec::<u32>::with_capacity(size as usize));
+        let solution_order = RwLock::new(Vec::<u64>::with_capacity(size as usize));
 
         Self {
-            size: size.into(),
+            size: size,
             h_size,
             v_size,
             n_algos,
-            graphs: graphs_vec.into_boxed_slice(),
-            solutions: solutions_vec.into_boxed_slice(),
+            graphs: Arc::from(graphs_vec.into_boxed_slice()),
+            solutions: Arc::from(solutions_vec.into_boxed_slice()),
             graph_order,
             solution_order,
             summary: RwLock::new(None),
@@ -77,6 +78,8 @@ impl Database {
         if let Some(lock) = self.graphs.get(graph_id as usize) {
             let mut guard = lock.write().await;
             *guard = Some(graph);
+        } else {
+            eprintln!("insert_graph(): id out of bounds");
         }
     }
 
@@ -85,6 +88,7 @@ impl Database {
             let guard = lock.read().await;
             guard.clone()
         } else {
+            eprintln!("get_graph(): id out of bounds");
             None
         }
     }
@@ -106,6 +110,8 @@ impl Database {
         if let Some(lock) = self.solutions.get(index) {
             let mut guard = lock.write().await;
             *guard = Some(solution);
+        } else {
+            eprintln!("insert_solution(): id out of bounds");
         }
     }
 
@@ -115,6 +121,7 @@ impl Database {
             let guard = lock.read().await;
             guard.clone()
         } else {
+            eprintln!("get_solution(): id out of bounds");
             None
         }
     }
@@ -128,5 +135,25 @@ impl Database {
        let algo_id = index / (self.h_size as u64 * self.v_size as u64);
        let graph_id = index % (self.h_size as u64 * self.v_size as u64);
        (algo_id as u16, graph_id as u32)
+    }
+
+    pub fn get_primitive_fields(&self) -> (u64, u16, u16, u16) {
+        (self.size, self.h_size, self.v_size, self.n_algos)
+    }
+
+    pub async fn print(&self) {
+        println!("Database:");
+        println!("  size: {}", self.size);
+        println!("  h_size: {}", self.h_size);
+        println!("  v_size: {}", self.v_size);
+        println!("  n_algos: {}", self.n_algos);
+        println!("  graphs:");
+        for g in self.graphs.iter() {
+            let guard = g.read().await;
+            match &*guard {
+                Some(g) => println!("    graph({})", g),
+                None => println!("    nothing"),
+            };
+        }
     }
 }

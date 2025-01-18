@@ -74,7 +74,7 @@ function createRunRequest(inputElements) {
                 n_nodes_min: parseInt(nodesMin),
                 n_nodes_max: parseInt(nodesMax),
                 n_nodes_step: parseInt(nodesStep),
-                node_density: parseInt(nodeDensity),
+                node_density: parseFloat(nodeDensity),
                 n_iterations: parseInt(iterations),
             },
             algosInUse,
