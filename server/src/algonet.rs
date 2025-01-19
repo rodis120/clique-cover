@@ -121,6 +121,28 @@ async fn handle_algonet_ws(
                                 println!("algonet: algo#{id} set as INACTIVE");
                             }
                         },
+                        MyMsg::GraphReady(session_id, graph_id) => {
+                            if let Some(graph) = state
+                                .database
+                                .read().await
+                                .get_graph(graph_id).await
+                            {
+                                println!("algonet: algo#{id}: received graph#{graph_id}");
+                                let msg = MyMsg::Graph(session_id, graph_id, graph);
+                                if let Ok(serialized) = bincode::serialize(&msg) {
+                                    if let Err(e) = ws_write
+                                        .send(Message::Binary(serialized))
+                                        .await
+                                    {
+                                        eprintln!("algo#{id}: failed to send graph#{graph_id}");
+                                    }
+                                } else {
+                                    eprintln!("algo#{id}: failed to serialize graph#{graph_id}");
+                                }
+                            } else {
+                                eprintln!("algo#{id}: failed to fetch graph#{graph_id}");
+                            }
+                        },
                         _ => {},
                     }
                 }

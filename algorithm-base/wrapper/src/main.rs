@@ -30,10 +30,32 @@ async fn main() -> Result<()> {
             .map_err(|_| "failed to send greeting")?;
     }
 
-    loop {
-        tokio::time::sleep(tokio::time::Duration::from_secs(5));
+    // For every message (graph) received from the server...
+    while let ws_data = ws_read.next().await {
+        match ws_data {
+            None => {
+                eprintln!("websocket connection has closed");
+            },
+            Some(Err(e)) => {
+                eprintln!("websocket failed to read: {}", e.to_string());
+            },
+            Some(Ok(Message::Binary(contents))) => {
+                tokio::spawn(handle_graph(contents));
+            },
+            _ => {
+                eprintln!("a message received from websocket, but the format is non-binary");
+            },
+        }
     }
 
     Ok(())
 }
 
+async fn handle_graph(message_bytes: Vec<u8>) {
+    if let Ok(msg) = bincode::deserialize::<MyMsg>(&message_bytes) {
+        if let MyMsg::Graph(session_id, graph_id, graph) = msg {
+            println!("received graph#{graph_id}");
+            // TODO: spawn a child process to handle the graph
+        }
+    }
+}
