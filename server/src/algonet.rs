@@ -96,6 +96,10 @@ async fn handle_algonet_ws(
 
                                 let _ = tx_algo_id.send(id).await;
                             },
+                            MyMsg::SolutionProduced(session_id, graph_id, solution) => {
+                                println!("algonet solution received: {solution:?}");
+                                // TODO
+                            },
                             _ => {},
                         }
                     }

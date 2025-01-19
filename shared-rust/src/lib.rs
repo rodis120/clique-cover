@@ -36,9 +36,10 @@ pub struct Algo {
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Solution {
-    pub correct: bool,
+    pub is_correct: bool,
     pub n_cliques: u16,
     pub n_cpu_cycles: u64,
+    pub contents: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -122,9 +122,9 @@ int main(int argc, char** argv) {
 	print_list(list, nodes);
 	#endif
 
-	for(int i = 0; i < argc; i++)
-		free(argv[i]);
-	free(argv);
+	// for(int i = 0; i < argc; i++)
+	//	  free(argv[i]);
+	// free(argv);
 
 	free_list(list, nodes);
 	char* clique_count_b64 = encode_number(argc - 2);
