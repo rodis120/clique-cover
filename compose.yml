@@ -35,6 +35,17 @@ services:
     build: ./algorithms/foo2
     networks:
       - algonet
+
+  algorithm-greedy:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/greedy
+    networks:
+      - algonet
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
   
   graph-generator:
     build: ./graph-generation
