@@ -84,6 +84,77 @@ function createRunRequest(inputElements) {
     return request;
 }
 
+function initChart(obj_id) {
+    const chart = new Chart(
+        document.getElementById(obj_id),
+        {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: []
+            },
+            options: {
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        }
+    );
+
+    return chart;
+}
+
+function getNodeCount(appState, graph_id) {
+    return appState.graphs.map[graph_id].nodes
+}
+
+function updateChart(chart, appState, key) {
+    const algorithms = new Map();
+    for(const solution of appState.solutions.list) {
+        if(!algorithms.has(solution.algo_id)) {
+            algorithms.set(solution.algo_id, new Map());
+        }
+
+        const nodes = getNodeCount(appState, solution.graph_id);
+        if(!algorithms[solution.algo_id].has(nodes)) {
+            algorithms[solution.algo_id].set(nodes, []);
+        }
+
+        algorithms[solution.algo_id][nodes].push({
+            nodes: nodes,
+            value: solution.result[key],
+        });
+    }
+
+    var labels = null;
+
+    const datasets = []
+    for(const algo of algorithms) {
+        const pairs = [];
+        for(const [nodes, points] of algo) {
+            const avg = points.reduce((acc, p) => acc + p, 0) / points.length;
+            pairs.push({nodes: nodes, avg: avg});
+        }
+        pairs.sort((a, b) => a.nodes - b.nodes);
+        
+        if (labels == null) {
+            labels = pairs.map(p => p.nodes);
+        }
+
+        datasets.push({
+            label: appState.algorithms.names[algo],
+            data: pairs.map(p => p.avg),
+            fill: false,
+        });
+    }
+
+    chart.data.labels = labels;
+    chart.data.datasets = datasets;
+    chart.update();
+}
+
 function createWebSocket(wsPath, inputElements, appState) {
     const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const wsHost = window.location.host
@@ -152,6 +223,37 @@ function createWebSocket(wsPath, inputElements, appState) {
                 });
 
                 break;
+
+            case 'Graph':
+                var graph_id = msgPayload[1];
+                var encoded_graph = msgPayload[2]["innner"];
+
+                var buffer = Uint8Array.fromBase64(encoded_graph);
+                var nodes = buffer[0] + buffer[1] * 0x100;
+
+                appState.graphs.map.set(graph_id, {
+                    graph_id: graph_id,
+                    nodes: nodes,
+                    encoded_graph: encoded_graph
+                });
+
+                break;
+
+            case 'Solution':
+                var algo_id = msgPayload[1];
+                var graph_id = msgPayload[2];
+                var result = msgPayload[3]
+
+                appState.solutions.list.push({
+                    algo_id: algo_id,
+                    graph_id: graph_id,
+                    result: result,
+                })
+
+                updateChart(appState.perf_chart, appState, 'n_cpu_cycles');
+                updateChart(appState.quality_chart, appState, 'n_cliques');
+
+                break;
         }
     });
 
@@ -194,9 +296,13 @@ document.addEventListener('DOMContentLoaded', () => {
         algorithms: {
         },
         graphs: {
+            map: new Map(),
         },
         solutions: {
+            list: [],
         },
+        perf_chart: initChart('performance_chart'),
+        quality_chart: initChart('quality_chart'),
     };
 
     const socket = createWebSocket('ws', inputElements, appState);
