@@ -107,7 +107,7 @@ function initChart(obj_id) {
 }
 
 function getNodeCount(appState, graph_id) {
-    return appState.graphs.map[graph_id].nodes
+    return appState.graphs.map.get(graph_id).nodes
 }
 
 function updateChart(chart, appState, key) {
@@ -118,11 +118,11 @@ function updateChart(chart, appState, key) {
         }
 
         const nodes = getNodeCount(appState, solution.graph_id);
-        if(!algorithms[solution.algo_id].has(nodes)) {
-            algorithms[solution.algo_id].set(nodes, []);
+        if(!algorithms.get(solution.algo_id).has(nodes)) {
+            algorithms.get(solution.algo_id).set(nodes, []);
         }
 
-        algorithms[solution.algo_id][nodes].push({
+        algorithms.get(solution.algo_id).get(nodes).push({
             nodes: nodes,
             value: solution.result[key],
         });
