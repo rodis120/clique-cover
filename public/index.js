@@ -226,7 +226,7 @@ function createWebSocket(wsPath, inputElements, appState) {
 
             case 'Graph':
                 var graph_id = msgPayload[1];
-                var encoded_graph = msgPayload[2]["innner"];
+                var encoded_graph = msgPayload[2]["inner"];
 
                 var buffer = Uint8Array.fromBase64(encoded_graph);
                 var nodes = buffer[0] + buffer[1] * 0x100;
