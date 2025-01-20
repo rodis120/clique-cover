@@ -22,20 +22,6 @@ services:
     build: ./algorithm-base
     image: algonet-client
 
-  algorithm-foo1:
-    depends_on:
-      - algonet-client
-    build: ./algorithms/foo1
-    networks:
-      - algonet
-    
-  algorithm-foo2:
-    depends_on:
-      - algonet-client
-    build: ./algorithms/foo2
-    networks:
-      - algonet
-
   algorithm-greedy:
     depends_on:
       - algonet-client
@@ -46,7 +32,40 @@ services:
       - SYS_ADMIN
     volumes:
       - /sys/kernel/debug:/sys/kernel/debug
+
+  algorithm-divset:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/divset
+    networks:
+      - algonet
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
   
+  algorithm-grafsil:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/grafsil
+    networks:
+      - algonet
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
+
+  algorithm-rga:
+    depends_on:
+      - algonet-client
+    build: ./algorithms/rga
+    networks:
+      - algonet
+    cap_add:
+      - SYS_ADMIN
+    volumes:
+      - /sys/kernel/debug:/sys/kernel/debug
+
   graph-generator:
     build: ./graph-generation
     image: graph-generator
