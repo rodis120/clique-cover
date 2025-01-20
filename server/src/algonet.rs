@@ -67,6 +67,7 @@ async fn handle_algonet_ws(
             let tx_to_website = state.tx_to_website;
             let state = state.shared_state.clone();
             tokio::spawn(async move {
+                let mut algo_id = 0xffffu16;
                 while let Some(Ok(Message::Binary(contents))) = ws_read.next().await {
                     let deserialized: std::result::Result<MyMsg, _> 
                         = bincode::deserialize(&contents);
@@ -76,29 +77,37 @@ async fn handle_algonet_ws(
                                 println!("A new algorithm has signed up: {}", name);
 
                                 let tx_algo_id = tx_algo_id.clone();
-                                let mut id = 0xffffu16;
 
                                 // add algorithm to state.algorithms
                                 {
                                     let mut guard = state.algorithms.write().await;
-                                    id = guard.len() as u16;
-                                    if (id == 0xffff) {
+                                    algo_id = guard.len() as u16;
+                                    if (algo_id == 0xffff) {
                                         eprintln!("algonet: a hilarious situation has occured");
                                     }
-                                    guard.push((id, name));
+                                    guard.push((algo_id, name));
                                 }
 
                                 // add algorithm to state.algos_in_use
                                 {
                                     let mut guard = state.algos_in_use.write().await;
-                                    guard.push(id);
+                                    guard.push(algo_id);
                                 }
 
-                                let _ = tx_algo_id.send(id).await;
+                                let _ = tx_algo_id.send(algo_id).await;
+
                             },
                             MyMsg::SolutionProduced(session_id, graph_id, solution) => {
-                                println!("algonet solution received: {solution:?}");
-                                // TODO
+                                if session_id == state.session_id.load(Ordering::Relaxed) {
+                                    println!("algonet: received solution#{algo_id}#{graph_id}");
+
+                                    state
+                                        .database.read().await
+                                        .insert_solution(solution, algo_id, graph_id).await;
+
+                                    let msg = MyMsg::SolutionReady(session_id, algo_id, graph_id);
+                                    tx_to_website.send(msg);
+                                }
                             },
                             _ => {},
                         }

@@ -149,7 +149,7 @@ async fn handle_graph(
                 .next()
                 .unwrap_or(&"")
                 .chars()
-                .map(|c| c == '0')
+                .map(|c| c == '1')
                 .next()
                 .unwrap_or(false);
 

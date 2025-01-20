@@ -133,7 +133,7 @@ async fn handle_websocket(
                                     .get_graph(graph_id).await
                                 {
                                     let msg = MyMsg::Graph(
-                                        shared_state.session_id.load(Ordering::Acquire),
+                                        session_id,
                                         graph_id,
                                         graph,
                                     );
@@ -143,6 +143,25 @@ async fn handle_websocket(
                                     println!("website: sent graph#{graph_id}");
                                 } else {
                                     eprintln!("website: failed to fetch graph#{graph_id}");
+                                }
+                            },
+                            MyMsg::SolutionReady(session_id, algo_id, graph_id) => {
+                                if let Some(solution) = shared_state
+                                    .database.read().await
+                                    .get_solution(algo_id, graph_id).await
+                                {
+                                    let msg = MyMsg::Solution(
+                                        session_id,
+                                        algo_id,
+                                        graph_id,
+                                        solution,
+                                    );
+                                    if let Ok(serialized) = serde_json::to_string(&msg) {
+                                        let _ = ws_write.send(Message::Text(serialized)).await;
+                                    }
+                                    println!("website: sent solution#{algo_id}#{graph_id}");
+                                } else {
+                                    eprintln!("website: failed to fetch solution#{algo_id}#{graph_id}");
                                 }
                             },
                             _ => {},
