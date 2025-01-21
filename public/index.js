@@ -131,7 +131,7 @@ function updateChart(chart, appState, key) {
     var labels = null;
 
     const datasets = []
-    for(const algo of algorithms) {
+    for(const [algo_id, algo] of algorithms) {
         const pairs = [];
         for(const [nodes, points] of algo) {
             const avg = points.reduce((acc, p) => acc + p, 0) / points.length;
@@ -144,7 +144,7 @@ function updateChart(chart, appState, key) {
         }
 
         datasets.push({
-            label: appState.algorithms.names[algo],
+            label: appState.algorithms.names[algo_id],
             data: pairs.map(p => p.avg),
             fill: false,
         });
