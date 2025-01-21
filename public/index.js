@@ -124,8 +124,6 @@ function updateChart(chart, appState, key) {
             algorithms.get(solution.algo_id).set(nodes, []);
         }
 
-        console.log(solution.result[key]);
-
         algorithms.get(solution.algo_id).get(nodes).push({
             nodes: nodes,
             value: solution.result[key],
@@ -138,7 +136,7 @@ function updateChart(chart, appState, key) {
     for(const [algo_id, algo] of algorithms) {
         const pairs = [];
         for(const [nodes, points] of algo) {
-            const avg = points.reduce((acc, p) => acc + p, 0) / points.length;
+            const avg = points.reduce((acc, p) => acc + p.value, 0) / points.length;
             pairs.push({nodes: nodes, avg: avg});
         }
         pairs.sort((a, b) => a.nodes - b.nodes);
