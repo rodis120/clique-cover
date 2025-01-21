@@ -94,11 +94,7 @@ function initChart(obj_id) {
                 datasets: []
             },
             options: {
-                scales: {
-                    y: {
-                        beginAtZero: true
-                    }
-                }
+                responsive: true,
             }
         }
     );
