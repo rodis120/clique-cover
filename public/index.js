@@ -124,6 +124,8 @@ function updateChart(chart, appState, key) {
             algorithms.get(solution.algo_id).set(nodes, []);
         }
 
+        console.log(solution.result[key]);
+
         algorithms.get(solution.algo_id).get(nodes).push({
             nodes: nodes,
             value: solution.result[key],
@@ -151,8 +153,6 @@ function updateChart(chart, appState, key) {
             fill: false,
         });
     }
-
-    console.log(datasets);
 
     chart.data.labels = labels;
     chart.data.datasets = datasets;
