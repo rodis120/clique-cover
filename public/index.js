@@ -84,7 +84,7 @@ function createRunRequest(inputElements) {
     return request;
 }
 
-function initChart(obj_id) {
+function initChart(obj_id, title) {
     const chart = new Chart(
         document.getElementById(obj_id),
         {
@@ -95,6 +95,12 @@ function initChart(obj_id) {
             },
             options: {
                 responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: title
+                    }
+                }
             }
         }
     );
@@ -145,6 +151,8 @@ function updateChart(chart, appState, key) {
             fill: false,
         });
     }
+
+    console.log(datasets);
 
     chart.data.labels = labels;
     chart.data.datasets = datasets;
@@ -297,8 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
         solutions: {
             list: [],
         },
-        perf_chart: initChart('performance_chart'),
-        quality_chart: initChart('quality_chart'),
+        perf_chart: initChart('performance_chart', 'Time'),
+        quality_chart: initChart('quality_chart', 'Qliques'),
     };
 
     const socket = createWebSocket('ws', inputElements, appState);
